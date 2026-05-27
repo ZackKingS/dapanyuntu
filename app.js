@@ -294,7 +294,7 @@
       if (rect.node.depth <= 1 && r.w > 48 && r.h > 23) {
         const size = Math.min(24, Math.max(15, Math.sqrt(r.w * r.h) / 14));
         drawFittedText(rect.node.name, r.x + 7, r.y + size + 1, r.w - 14, size, "#f6eee4", true);
-      } else if (!rect.node.children && r.w > 46 && r.h > 24) {
+      } else if (!rect.node.children && r.w > 22 && r.h > 11) {
         drawStockLabel(rect.node, perf, r);
       }
 
@@ -357,27 +357,27 @@
   function stockFontSize(rect) {
     const area = rect.w * rect.h;
     const base = Math.sqrt(area) / 7.6;
-    const edgeLimit = Math.min(rect.w / 5.6, rect.h / 2.55);
-    return Math.max(9, Math.min(30, base, edgeLimit));
+    const edgeLimit = Math.min(rect.w / 4.2, rect.h / 2.0);
+    return Math.max(6, Math.min(30, base, edgeLimit));
   }
 
   function drawStockLabel(node, perf, rect) {
     let fontSize = stockFontSize(rect);
-    let valueSize = Math.max(8, Math.min(fontSize * 0.94, rect.h / 3.4));
-    let pad = Math.max(3, Math.min(8, fontSize * 0.38));
-    const gap = 2;
+    let valueSize = Math.max(6, Math.min(fontSize * 0.94, rect.h / 3.4));
+    let pad = Math.max(2, Math.min(8, fontSize * 0.38));
+    const gap = 1;
     const availableHeight = rect.h - pad * 2;
 
     if (availableHeight < fontSize + valueSize + gap) {
-      const ratio = Math.max(0.42, availableHeight / (fontSize + valueSize + gap));
-      fontSize = Math.max(7, fontSize * ratio);
-      valueSize = Math.max(7, valueSize * ratio);
-      pad = Math.max(2, Math.min(7, fontSize * 0.34));
+      const ratio = Math.max(0.38, availableHeight / (fontSize + valueSize + gap));
+      fontSize = Math.max(6, fontSize * ratio);
+      valueSize = Math.max(6, valueSize * ratio);
+      pad = Math.max(1, Math.min(7, fontSize * 0.34));
     }
 
     const maxWidth = rect.w - pad * 2;
-    const canShowValue = rect.h >= pad * 2 + fontSize + valueSize + gap && rect.w > 28 && valueSize >= 7 && perf.value !== null;
-    const canShowName = rect.h >= pad * 2 + fontSize && rect.w > 26 && fontSize >= 7;
+    const canShowValue = rect.h >= pad * 2 + fontSize + valueSize + gap && rect.w > 18 && valueSize >= 6 && perf.value !== null;
+    const canShowName = rect.h >= pad * 2 + fontSize && rect.w > 16 && fontSize >= 6;
 
     if (!canShowName) return;
     const centerX = rect.x + rect.w / 2;
