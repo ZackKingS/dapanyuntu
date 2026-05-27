@@ -39,6 +39,31 @@ function send(res, status, body, headers = {}) {
   res.end(body);
 }
 
+// 处理API响应：移除股票名称中的 -U 后缀
+function removeUsuffix(jsonStr) {
+  try {
+    const data = JSON.parse(jsonStr);
+
+    // 如果响应包含 data 字段且是对象，处理其中的股票名称
+    if (data.data && typeof data.data === 'object') {
+      const processed = {};
+
+      for (const [key, value] of Object.entries(data.data)) {
+        // 移除股票名称中的 -U 后缀
+        const newKey = key.replace(/-U$/, '');
+        processed[newKey] = value;
+      }
+
+      data.data = processed;
+    }
+
+    return JSON.stringify(data);
+  } catch (error) {
+    // 如果不是JSON或处理失败，直接返回原始字符串
+    return jsonStr;
+  }
+}
+
 // ==================== API代理 ====================
 // 代理来自前端的API请求到dapanyuntu.com
 // 作用：1. 绕过浏览器跨域限制
@@ -67,7 +92,12 @@ async function proxyDpyt(req, res, url) {
         "referer": "https://dapanyuntu.com/",
       },
     });
-    const text = await upstream.text();
+    let text = await upstream.text();
+
+    // 处理响应数据：移除股票名称中的 -U 后缀
+    if (targetPath === "/dpyt/getMapParamDataV3" || targetPath === "/dpyt/getMapParamDataV2") {
+      text = removeUsuffix(text);
+    }
 
     // 转发响应：保留原始状态码、Content-Type，添加CORS头允许跨域
     send(res, upstream.status, text, {
