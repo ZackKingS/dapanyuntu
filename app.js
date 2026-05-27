@@ -316,7 +316,7 @@
 
       // 绘制标签：行业名称或股票名称+涨跌幅
       if (rect.node.depth <= 1 && r.w > 48 && r.h > 23) {
-        const size = Math.min(20, Math.max(12, Math.sqrt(r.w * r.h) / 13));
+        const size = Math.min(13, Math.max(8, Math.sqrt(r.w * r.h) / 16));
         drawFittedText(rect.node.name, r.x + 7, r.y + size + 1, r.w - 14, size, "#f6eee4", true);
       } else if (!rect.node.children && r.w > 22 && r.h > 11) {
         // 优化：降低阈值，小股票也能显示标签
