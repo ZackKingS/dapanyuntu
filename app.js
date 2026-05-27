@@ -439,33 +439,33 @@
 
   function stockFontSize(rect) {
     const area = rect.w * rect.h;
-    const base = Math.sqrt(area) / 6.5;
-    const edgeLimit = Math.min(rect.w / 3.8, rect.h / 1.8);
-    return Math.max(7, Math.min(36, base, edgeLimit));
+    const base = Math.sqrt(area) / 5.45;
+    const edgeLimit = Math.min(rect.w / 3.35, rect.h / 1.62);
+    return Math.max(8, Math.min(42, base, edgeLimit));
   }
 
   // 绘制股票标签（名称和涨跌幅）
   function drawStockLabel(node, perf, rect) {
     // 根据矩形大小计算字号
     let fontSize = stockFontSize(rect);
-    let valueSize = Math.max(6, Math.min(fontSize * 0.94, rect.h / 3.4));
-    let pad = Math.max(2, Math.min(8, fontSize * 0.38)); // 内边距
-    const gap = 1; // 名称和涨跌幅之间的间隔
+    let valueSize = Math.max(7, Math.min(fontSize * 0.96, rect.h / 3.15));
+    let pad = Math.max(1.5, Math.min(7, fontSize * 0.28)); // 内边距
+    const gap = Math.max(1, Math.min(3, fontSize * 0.06)); // 名称和涨跌幅之间的间隔
     const availableHeight = rect.h - pad * 2;
 
     // 如果空间不够，缩小字号
     if (availableHeight < fontSize + valueSize + gap) {
       const ratio = Math.max(0.38, availableHeight / (fontSize + valueSize + gap));
-      fontSize = Math.max(6, fontSize * ratio);
-      valueSize = Math.max(6, valueSize * ratio);
-      pad = Math.max(1, Math.min(7, fontSize * 0.34));
+      fontSize = Math.max(7, fontSize * ratio);
+      valueSize = Math.max(7, valueSize * ratio);
+      pad = Math.max(1, Math.min(6, fontSize * 0.24));
     }
 
     const maxWidth = rect.w - pad * 2;
     // 判断是否有足够空间显示涨跌幅
-    const canShowValue = rect.h >= pad * 2 + fontSize + valueSize + gap && rect.w > 18 && valueSize >= 6 && perf.value !== null;
+    const canShowValue = rect.h >= pad * 2 + fontSize + valueSize + gap && rect.w > 18 && valueSize >= 7 && perf.value !== null;
     // 判断是否有足够空间显示名称
-    const canShowName = rect.h >= pad * 2 + fontSize && rect.w > 16 && fontSize >= 6;
+    const canShowName = rect.h >= pad * 2 + fontSize && rect.w > 16 && fontSize >= 7;
 
     if (!canShowName) return; // 空间太小，不显示任何文字
 
