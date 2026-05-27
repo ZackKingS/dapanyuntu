@@ -94,7 +94,7 @@
     return nodes.reduce((sum, node) => sum + Math.max(0.01, node.scale), 0);
   }
 
-  function binaryTreemap(nodes, rect, depth = 0) {
+  function balancedTreemap(nodes, rect) {
     if (!nodes.length) return [];
     if (nodes.length === 1) return [{ node: nodes[0], ...rect }];
 
@@ -116,16 +116,80 @@
     if (rect.w >= rect.h) {
       const w1 = rect.w * ratio;
       return [
-        ...binaryTreemap(left, { x: rect.x, y: rect.y, w: w1, h: rect.h }, depth + 1),
-        ...binaryTreemap(right, { x: rect.x + w1, y: rect.y, w: rect.w - w1, h: rect.h }, depth + 1),
+        ...balancedTreemap(left, { x: rect.x, y: rect.y, w: w1, h: rect.h }),
+        ...balancedTreemap(right, { x: rect.x + w1, y: rect.y, w: rect.w - w1, h: rect.h }),
       ];
     }
 
     const h1 = rect.h * ratio;
     return [
-      ...binaryTreemap(left, { x: rect.x, y: rect.y, w: rect.w, h: h1 }, depth + 1),
-      ...binaryTreemap(right, { x: rect.x, y: rect.y + h1, w: rect.w, h: rect.h - h1 }, depth + 1),
+      ...balancedTreemap(left, { x: rect.x, y: rect.y, w: rect.w, h: h1 }),
+      ...balancedTreemap(right, { x: rect.x, y: rect.y + h1, w: rect.w, h: rect.h - h1 }),
     ];
+  }
+
+  function worstAspect(row, side) {
+    if (!row.length || side <= 0) return Infinity;
+    const areas = row.map((item) => item.area);
+    const sum = areas.reduce((a, b) => a + b, 0);
+    const max = Math.max(...areas);
+    const min = Math.min(...areas);
+    const side2 = side * side;
+    return Math.max((side2 * max) / (sum * sum), (sum * sum) / (side2 * min));
+  }
+
+  function layoutSquarifyRow(row, rect, out) {
+    const rowArea = row.reduce((sum, item) => sum + item.area, 0);
+    if (rect.w >= rect.h) {
+      const w = Math.min(rect.w, rowArea / rect.h);
+      let y = rect.y;
+      row.forEach((item, index) => {
+        const isLast = index === row.length - 1;
+        const h = isLast ? rect.y + rect.h - y : item.area / w;
+        out.push({ node: item.node, x: rect.x, y, w, h });
+        y += h;
+      });
+      return { x: rect.x + w, y: rect.y, w: Math.max(0, rect.w - w), h: rect.h };
+    }
+
+    const h = Math.min(rect.h, rowArea / rect.w);
+    let x = rect.x;
+    row.forEach((item, index) => {
+      const isLast = index === row.length - 1;
+      const w = isLast ? rect.x + rect.w - x : item.area / h;
+      out.push({ node: item.node, x, y: rect.y, w, h });
+      x += w;
+    });
+    return { x: rect.x, y: rect.y + h, w: rect.w, h: Math.max(0, rect.h - h) };
+  }
+
+  function squarifiedTreemap(nodes, rect) {
+    if (!nodes.length || rect.w <= 0 || rect.h <= 0) return [];
+    if (nodes.length === 1) return [{ node: nodes[0], ...rect }];
+
+    const scale = (rect.w * rect.h) / totalScale(nodes);
+    const items = nodes
+      .slice()
+      .sort((a, b) => b.scale - a.scale)
+      .map((node) => ({ node, area: Math.max(0.01, node.scale) * scale }));
+
+    const out = [];
+    let remaining = { ...rect };
+    let row = [];
+
+    while (items.length) {
+      const item = items[0];
+      const side = Math.min(remaining.w, remaining.h);
+      if (!row.length || worstAspect([...row, item], side) <= worstAspect(row, side)) {
+        row.push(items.shift());
+      } else {
+        remaining = layoutSquarifyRow(row, remaining, out);
+        row = [];
+      }
+    }
+
+    if (row.length) layoutSquarifyRow(row, remaining, out);
+    return out;
   }
 
   function layoutNode(node, rect, out) {
@@ -141,7 +205,8 @@
       h: Math.max(0, rect.h - pad * 2 - header),
     };
 
-    binaryTreemap(node.children, inner).forEach((item) => layoutNode(item.node, item, out));
+    const childRects = node.depth === 0 ? balancedTreemap(node.children, inner) : squarifiedTreemap(node.children, inner);
+    childRects.forEach((item) => layoutNode(item.node, item, out));
   }
 
   function parsePerf(raw) {
