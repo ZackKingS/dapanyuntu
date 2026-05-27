@@ -562,6 +562,7 @@
         state.panY = 0;
         state.zoom = 1;
         state.selected = null;
+        handleSearch();
         render();
       });
     });
