@@ -651,7 +651,9 @@
     canvas.addEventListener("dblclick", (event) => {
       const hit = hitTest(event.clientX, event.clientY);
       if (!hit || hit.node.children || !/\.(SH|SZ|BJ)$/.test(hit.node.id)) return;
-      window.open(`https://xueqiu.com/S/${hit.node.id.replace(".", "")}`, "_blank", "noreferrer");
+      // 将 603993.SH 转换为 SH603993 的格式
+      const symbolId = hit.node.id.replace(/^(.+)\.(.+)$/, "$2$1");
+      window.open(`https://xueqiu.com/S/${symbolId}`, "_blank", "noreferrer");
     });
 
     searchInput.addEventListener("input", handleSearch);
