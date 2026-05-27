@@ -226,7 +226,7 @@
       ctx.lineWidth = rect.node.depth <= 1 ? 1.2 : 0.65;
       ctx.strokeRect(Math.round(r.x) + 0.5, Math.round(r.y) + 0.5, Math.max(0, Math.ceil(r.w) - 1), Math.max(0, Math.ceil(r.h) - 1));
 
-      if (rect.node.depth === 0 && r.w > 48 && r.h > 23) {
+      if (rect.node.depth <= 1 && r.w > 48 && r.h > 23) {
         const size = Math.min(24, Math.max(15, Math.sqrt(r.w * r.h) / 14));
         drawFittedText(rect.node.name, r.x + 7, r.y + size + 1, r.w - 14, size, "#f6eee4", true);
       } else if (!rect.node.children && r.w > 46 && r.h > 24) {
@@ -239,10 +239,6 @@
         ctx.strokeRect(r.x + 2, r.y + 2, Math.max(0, r.w - 4), Math.max(0, r.h - 4));
       }
     });
-
-    state.rects
-      .filter((rect) => rect.node.depth === 1 && visible(rect.screen, width, height))
-      .forEach((rect) => drawSectorLabel(rect.node, rect.screen));
 
     emptyState.hidden = Object.keys(state.perf).length > 0;
   }
@@ -293,12 +289,6 @@
     ctx.restore();
   }
 
-  function drawSectorLabel(node, rect) {
-    if (rect.w < 68 || rect.h < 44) return;
-    const size = Math.max(14, Math.min(26, Math.sqrt(rect.w * rect.h) / 13));
-    drawCenteredFittedText(node.name, rect.x + rect.w / 2, rect.y + rect.h / 2, rect.w - 18, size, "#fff7ee", true);
-  }
-
   function stockFontSize(rect) {
     const area = rect.w * rect.h;
     const base = Math.sqrt(area) / 7.6;
@@ -308,18 +298,25 @@
 
   function drawStockLabel(node, perf, rect) {
     const fontSize = stockFontSize(rect);
-    const lineHeight = Math.round(fontSize * 1.18);
     const pad = Math.max(3, Math.min(8, fontSize * 0.38));
     const maxWidth = rect.w - pad * 2;
-    const canShowValue = rect.h >= pad * 2 + lineHeight * 2 - 1 && rect.w > 42;
-    const canShowName = rect.h >= pad * 2 + lineHeight && rect.w > 36;
+    const valueSize = Math.max(9, Math.min(fontSize * 0.94, rect.h / 3.4));
+    const canShowValue = rect.h >= pad * 2 + fontSize + valueSize + 5 && rect.w > 42 && fontSize >= 10;
+    const canShowName = rect.h >= pad * 2 + fontSize && rect.w > 36;
 
     if (!canShowName) return;
-    drawFittedText(node.name, rect.x + pad, rect.y + pad + fontSize, maxWidth, fontSize, "#fff7ee", false);
+    const centerX = rect.x + rect.w / 2;
+    const centerY = rect.y + rect.h / 2;
 
-    if (!canShowValue || fontSize < 10) return;
-    const valueSize = Math.max(9, Math.min(fontSize * 0.94, rect.h / 3.4));
-    drawFittedText(formatValue(perf.value), rect.x + pad, rect.y + pad + fontSize + lineHeight, maxWidth, valueSize, "#fff7ee", true);
+    if (!canShowValue) {
+      drawCenteredFittedText(node.name, centerX, centerY, maxWidth, fontSize, "#fff7ee", false);
+      return;
+    }
+
+    const gap = Math.max(2, fontSize * 0.12);
+    const totalHeight = fontSize + valueSize + gap;
+    drawCenteredFittedText(node.name, centerX, centerY - totalHeight / 2 + fontSize / 2, maxWidth, fontSize, "#fff7ee", false);
+    drawCenteredFittedText(formatValue(perf.value), centerX, centerY + totalHeight / 2 - valueSize / 2, maxWidth, valueSize, "#fff7ee", true);
   }
 
   function formatValue(value) {
