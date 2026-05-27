@@ -241,8 +241,16 @@
   }
 
   // 根据数值计算热力图颜色：红色表示上涨，绿色表示下跌，灰色表示无数据
-  const CHANGE_COLORS = ["#00d641", "#1aa448", "#0e6f2f", "#085421", "#424453", "#6d1414", "#961010", "#be0808", "#e41414"];
-  const VALUATION_COLORS = CHANGE_COLORS.slice().reverse();
+  const LEGEND_CHANGE_COLORS = ["#00d641", "#1aa448", "#0e6f2f", "#085421", "#424453", "#6d1414", "#961010", "#be0808", "#e41414"];
+  const MAP_CHANGE_COLORS = [
+    "#30cc5a", "#30c558", "#30be56", "#2fb854", "#2fb152", "#2faa51", "#2fa450", "#2f9e4f", "#30974f", "#31904e",
+    "#31894e", "#32844e", "#347d4e", "#35764e", "#366f4e", "#38694f", "#3a614f", "#3b5a50", "#3d5451", "#3f4c53",
+    "#414554", "#4f4554", "#5a4554", "#644553", "#6f4552", "#784551", "#824450", "#8b444e", "#94444d", "#9d434b",
+    "#a5424a", "#ae4248", "#b64146", "#bf4045", "#c73e43", "#ce3d41", "#d73c3f", "#df3a3d", "#e6393b", "#ee373a",
+    "#f63538",
+  ];
+  const MAP_VALUATION_COLORS = MAP_CHANGE_COLORS.slice().reverse();
+  const LEGEND_VALUATION_COLORS = LEGEND_CHANGE_COLORS.slice().reverse();
   const SCALE_STOPS = {
     "mkt_idx.cur_chng_pct": [-4, -3, -2, -1, 0, 1, 2, 3, 4],
     RECENT_1WEEK_RATE: [-8, -6, -4, -2, 0, 2, 4, 6, 8],
@@ -282,12 +290,29 @@
     return colors[last];
   }
 
+  function rampColor(value, stops, colors) {
+    const min = stops[0];
+    const max = stops[stops.length - 1];
+    if (value <= min) return colors[0];
+    if (value >= max) return colors[colors.length - 1];
+    const position = ((value - min) / (max - min)) * (colors.length - 1);
+    const index = Math.floor(position);
+    return mixHex(colors[index], colors[index + 1], position - index);
+  }
+
   function colorFor(value) {
     if (value === null || Number.isNaN(value)) return "#2f323d";
     if (state.metric === "PE_TTM" || state.metric === "PB") {
-      return scaleColor(value, SCALE_STOPS[state.metric], VALUATION_COLORS);
+      return rampColor(value, SCALE_STOPS[state.metric], MAP_VALUATION_COLORS);
     }
-    return scaleColor(value, SCALE_STOPS[state.metric] || SCALE_STOPS["mkt_idx.cur_chng_pct"], CHANGE_COLORS);
+    return rampColor(value, SCALE_STOPS[state.metric] || SCALE_STOPS["mkt_idx.cur_chng_pct"], MAP_CHANGE_COLORS);
+  }
+
+  function legendColorFor(value) {
+    if (state.metric === "PE_TTM" || state.metric === "PB") {
+      return scaleColor(value, SCALE_STOPS[state.metric], LEGEND_VALUATION_COLORS);
+    }
+    return scaleColor(value, SCALE_STOPS[state.metric] || SCALE_STOPS["mkt_idx.cur_chng_pct"], LEGEND_CHANGE_COLORS);
   }
 
   function setupCanvas() {
@@ -571,7 +596,7 @@
     legend.innerHTML = labels
       .map((label) => {
         const value = Number(label.replace("%", ""));
-        const color = state.metric === "PE_TTM" || state.metric === "PB" ? colorFor(value) : colorFor(value);
+        const color = legendColorFor(value);
         return `<span class="legend-step" style="background:${color}">${label}</span>`;
       })
       .join("");
