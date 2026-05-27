@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>大盘云图 - 本地复刻版</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <section class="brand-block">
+          <h1>大盘云图</h1>
+          <div class="brand-links">
+            <a href="https://dapanyuntu.com/" target="_blank" rel="noreferrer">原站 dapanyuntu.com</a>
+            <a href="https://dpyt.cc/" target="_blank" rel="noreferrer">防丢地址 dpyt.cc</a>
+          </div>
+        </section>
+
+        <section id="indexStrip" class="index-strip" aria-label="主要指数"></section>
+
+        <section class="top-actions">
+          <time id="clock">--:--:--</time>
+          <button id="refreshBtn" class="icon-btn" type="button" title="刷新行情">刷新</button>
+          <button id="fullscreenBtn" class="icon-btn" type="button" title="沉浸视图">沉浸</button>
+        </section>
+      </header>
+
+      <section class="workspace">
+        <aside class="sidebar">
+          <nav class="market-nav" aria-label="市场范围">
+            <button class="active" data-map="global" type="button">A股全图</button>
+            <button data-map="mainSH" type="button">上证A股</button>
+            <button data-map="mainSZ" type="button">深证A股</button>
+            <button data-map="bjs" type="button">北交所A股</button>
+            <button data-map="kcb" type="button">科创板</button>
+            <button data-map="399006" type="button">创业板</button>
+          </nav>
+
+          <label class="field">
+            <span>指标</span>
+            <select id="metricSelect">
+              <option value="mkt_idx.cur_chng_pct" selected>涨跌幅</option>
+              <option value="RECENT_1WEEK_RATE">近1周涨跌幅</option>
+              <option value="RECENT_HALF_MOUTH_RATE">近2周涨跌幅</option>
+              <option value="RATE60">近2月涨跌幅</option>
+              <option value="THIS_YEAR_RATE">年初至今涨跌幅</option>
+              <option value="PE_TTM">市盈率(TTM)</option>
+              <option value="PB">市净率</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>搜索</span>
+            <input id="searchInput" type="search" placeholder="股票、行业或代码" autocomplete="off" />
+          </label>
+
+          <div id="searchResults" class="search-results"></div>
+
+          <div class="tool-row">
+            <button id="captureBtn" type="button">截图分享</button>
+            <button id="autoBtn" class="active" type="button">自动刷新</button>
+          </div>
+
+          <section class="notes">
+            <p>面积代表总市值</p>
+            <p>颜色代表涨跌幅或所选指标</p>
+            <p>拖动查看区域，滚轮缩放</p>
+            <p>双击个股打开雪球 K 线</p>
+          </section>
+        </aside>
+
+        <section class="map-panel">
+          <canvas id="mapCanvas"></canvas>
+          <div id="tooltip" class="tooltip" hidden></div>
+          <div id="emptyState" class="empty-state">正在加载行情数据...</div>
+        </section>
+      </section>
+
+      <footer class="bottom-bar">
+        <section class="recall">
+          <span>本日复盘</span>
+          <button data-time="9:30" type="button">9:30</button>
+          <button data-time="10:00" type="button">10:00</button>
+          <button data-time="10:30" type="button">10:30</button>
+          <button data-time="11:00" type="button">11:00</button>
+          <button data-time="11:30" type="button">11:30</button>
+          <button data-time="13:30" type="button">13:30</button>
+          <button data-time="14:00" type="button">14:00</button>
+          <button data-time="14:30" type="button">14:30</button>
+          <button data-time="15:00" type="button">15:00</button>
+        </section>
+        <section id="legend" class="legend"></section>
+      </footer>
+    </main>
+
+    <dialog id="captureDialog">
+      <form method="dialog">
+        <button class="dialog-close" value="cancel" title="关闭">×</button>
+      </form>
+      <img id="captureImage" alt="大盘云图截图" />
+      <div class="dialog-actions">
+        <a id="downloadCapture" download="大盘云图-本地复刻.png">下载保存</a>
+      </div>
+    </dialog>
+
+    <script src="./mapData.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
