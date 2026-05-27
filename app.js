@@ -226,7 +226,7 @@
       ctx.lineWidth = rect.node.depth <= 1 ? 1.2 : 0.65;
       ctx.strokeRect(Math.round(r.x) + 0.5, Math.round(r.y) + 0.5, Math.max(0, Math.ceil(r.w) - 1), Math.max(0, Math.ceil(r.h) - 1));
 
-      if (rect.node.depth <= 1 && r.w > 48 && r.h > 23) {
+      if (rect.node.depth === 0 && r.w > 48 && r.h > 23) {
         const size = Math.min(24, Math.max(15, Math.sqrt(r.w * r.h) / 14));
         drawFittedText(rect.node.name, r.x + 7, r.y + size + 1, r.w - 14, size, "#f6eee4", true);
       } else if (!rect.node.children && r.w > 46 && r.h > 24) {
@@ -239,6 +239,10 @@
         ctx.strokeRect(r.x + 2, r.y + 2, Math.max(0, r.w - 4), Math.max(0, r.h - 4));
       }
     });
+
+    state.rects
+      .filter((rect) => rect.node.depth === 1 && visible(rect.screen, width, height))
+      .forEach((rect) => drawSectorLabel(rect.node, rect.screen));
 
     emptyState.hidden = Object.keys(state.perf).length > 0;
   }
@@ -263,6 +267,36 @@
       clipped = clipped.slice(0, -1);
     }
     drawText(clipped.length > 1 ? `${clipped}...` : clipped, x, y, size, color, bold);
+  }
+
+  function drawCenteredFittedText(text, cx, cy, maxWidth, size, color, bold) {
+    const value = String(text);
+    ctx.save();
+    ctx.font = `${bold ? "700 " : ""}${size}px Microsoft YaHei, Arial`;
+    ctx.fillStyle = color;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(0, 0, 0, 0.78)";
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+
+    let clipped = value;
+    if (ctx.measureText(clipped).width > maxWidth) {
+      while (clipped.length > 1 && ctx.measureText(`${clipped}...`).width > maxWidth) {
+        clipped = clipped.slice(0, -1);
+      }
+      clipped = clipped.length > 1 ? `${clipped}...` : clipped;
+    }
+
+    ctx.fillText(clipped, cx, cy);
+    ctx.restore();
+  }
+
+  function drawSectorLabel(node, rect) {
+    if (rect.w < 68 || rect.h < 44) return;
+    const size = Math.max(14, Math.min(26, Math.sqrt(rect.w * rect.h) / 13));
+    drawCenteredFittedText(node.name, rect.x + rect.w / 2, rect.y + rect.h / 2, rect.w - 18, size, "#fff7ee", true);
   }
 
   function stockFontSize(rect) {
