@@ -241,21 +241,53 @@
   }
 
   // 根据数值计算热力图颜色：红色表示上涨，绿色表示下跌，灰色表示无数据
-  function colorFor(value) {
-    if (value === null || Number.isNaN(value)) return "#3e403f"; // 无数据显示灰色
-    if (state.metric === "PE_TTM" || state.metric === "PB") {
-      // 估值指标：从绿色（低）到红色（高）
-      const clamped = Math.max(0, Math.min(1, value / (state.metric === "PE_TTM" ? 120 : 9.6)));
-      const hue = 124 - clamped * 124; // 绿色(124) 到 红色(0)
-      return `hsl(${hue} 72% ${32 + clamped * 10}%)`;
-    }
+  const CHANGE_COLORS = ["#00d641", "#1aa448", "#0e6f2f", "#085421", "#424453", "#6d1414", "#961010", "#be0808", "#e41414"];
+  const VALUATION_COLORS = CHANGE_COLORS.slice().reverse();
+  const SCALE_STOPS = {
+    "mkt_idx.cur_chng_pct": [-4, -3, -2, -1, 0, 1, 2, 3, 4],
+    RECENT_1WEEK_RATE: [-8, -6, -4, -2, 0, 2, 4, 6, 8],
+    RECENT_HALF_MOUTH_RATE: [-12, -9, -6, -3, 0, 3, 6, 9, 12],
+    RATE60: [-24, -18, -12, -6, 0, 6, 12, 18, 24],
+    THIS_YEAR_RATE: [-32, -24, -16, -8, 0, 8, 16, 24, 32],
+    PE_TTM: [0, 15, 30, 45, 60, 75, 90, 105, 120],
+    PB: [0, 1.2, 2.4, 3.6, 4.8, 6, 7.2, 8.4, 9.6],
+  };
 
-    // 涨跌幅指标：根据数值大小加深颜色
-    const limit = state.metric === "mkt_idx.cur_chng_pct" ? 4 : state.metric === "THIS_YEAR_RATE" ? 32 : 24;
-    const mag = Math.min(1, Math.abs(value) / limit); // 归一化到 0-1
-    if (value > 0) return `hsl(2 76% ${26 + mag * 28}%)`; // 红色
-    if (value < 0) return `hsl(145 76% ${24 + mag * 28}%)`; // 绿色
-    return "#444640"; // 零涨跌
+  function hexToRgb(hex) {
+    const value = hex.replace("#", "");
+    return {
+      r: parseInt(value.slice(0, 2), 16),
+      g: parseInt(value.slice(2, 4), 16),
+      b: parseInt(value.slice(4, 6), 16),
+    };
+  }
+
+  function mixHex(from, to, ratio) {
+    const a = hexToRgb(from);
+    const b = hexToRgb(to);
+    const channel = (start, end) => Math.round(start + (end - start) * ratio).toString(16).padStart(2, "0");
+    return `#${channel(a.r, b.r)}${channel(a.g, b.g)}${channel(a.b, b.b)}`;
+  }
+
+  function scaleColor(value, stops, colors) {
+    if (value <= stops[0]) return colors[0];
+    const last = stops.length - 1;
+    if (value >= stops[last]) return colors[last];
+    for (let i = 0; i < last; i += 1) {
+      if (value <= stops[i + 1]) {
+        const ratio = (value - stops[i]) / (stops[i + 1] - stops[i]);
+        return mixHex(colors[i], colors[i + 1], ratio);
+      }
+    }
+    return colors[last];
+  }
+
+  function colorFor(value) {
+    if (value === null || Number.isNaN(value)) return "#2f323d";
+    if (state.metric === "PE_TTM" || state.metric === "PB") {
+      return scaleColor(value, SCALE_STOPS[state.metric], VALUATION_COLORS);
+    }
+    return scaleColor(value, SCALE_STOPS[state.metric] || SCALE_STOPS["mkt_idx.cur_chng_pct"], CHANGE_COLORS);
   }
 
   function setupCanvas() {
@@ -533,12 +565,9 @@
 
   function renderLegend() {
     const legend = document.getElementById("legend");
-    const labels =
-      state.metric === "PE_TTM"
-        ? ["0", "15", "30", "45", "60", "75", "90", "105", "120"]
-        : state.metric === "PB"
-          ? ["0", "1.2", "2.4", "3.6", "4.8", "6", "7.2", "8.4", "9.6"]
-          : ["-4%", "-3%", "-2%", "-1%", "0%", "1%", "2%", "3%", "4%"];
+    const labels = SCALE_STOPS[state.metric].map((value) => (
+      state.metric === "PE_TTM" || state.metric === "PB" ? String(value) : `${value}%`
+    ));
     legend.innerHTML = labels
       .map((label) => {
         const value = Number(label.replace("%", ""));
