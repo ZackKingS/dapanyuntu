@@ -297,12 +297,22 @@
   }
 
   function drawStockLabel(node, perf, rect) {
-    const fontSize = stockFontSize(rect);
-    const pad = Math.max(3, Math.min(8, fontSize * 0.38));
+    let fontSize = stockFontSize(rect);
+    let valueSize = Math.max(8, Math.min(fontSize * 0.94, rect.h / 3.4));
+    let pad = Math.max(3, Math.min(8, fontSize * 0.38));
+    const gap = 2;
+    const availableHeight = rect.h - pad * 2;
+
+    if (availableHeight < fontSize + valueSize + gap) {
+      const ratio = Math.max(0.42, availableHeight / (fontSize + valueSize + gap));
+      fontSize = Math.max(7, fontSize * ratio);
+      valueSize = Math.max(7, valueSize * ratio);
+      pad = Math.max(2, Math.min(7, fontSize * 0.34));
+    }
+
     const maxWidth = rect.w - pad * 2;
-    const valueSize = Math.max(9, Math.min(fontSize * 0.94, rect.h / 3.4));
-    const canShowValue = rect.h >= pad * 2 + fontSize + valueSize + 5 && rect.w > 42 && fontSize >= 10;
-    const canShowName = rect.h >= pad * 2 + fontSize && rect.w > 36;
+    const canShowValue = rect.h >= pad * 2 + fontSize + valueSize + gap && rect.w > 28 && valueSize >= 7 && perf.value !== null;
+    const canShowName = rect.h >= pad * 2 + fontSize && rect.w > 26 && fontSize >= 7;
 
     if (!canShowName) return;
     const centerX = rect.x + rect.w / 2;
@@ -313,7 +323,6 @@
       return;
     }
 
-    const gap = Math.max(2, fontSize * 0.12);
     const totalHeight = fontSize + valueSize + gap;
     drawCenteredFittedText(node.name, centerX, centerY - totalHeight / 2 + fontSize / 2, maxWidth, fontSize, "#fff7ee", false);
     drawCenteredFittedText(formatValue(perf.value), centerX, centerY + totalHeight / 2 - valueSize / 2, maxWidth, valueSize, "#fff7ee", true);
