@@ -12,8 +12,8 @@
         <section class="brand-block">
           <h1>大盘云图</h1>
           <div class="brand-links">
-            <a href="https://dapanyuntu.com/" target="_blank" rel="noreferrer">原站 dapanyuntu.com</a>
-            <a href="https://dpyt.cc/" target="_blank" rel="noreferrer">防丢地址 dpyt.cc</a>
+            <a href="https://dapanyuntu.com/" target="_blank" rel="noreferrer">收藏网址：dapanyuntu.com</a>
+            <a href="https://dpyt.cc/" target="_blank" rel="noreferrer">防丢网址：dpyt.cc</a>
           </div>
         </section>
 
@@ -23,11 +23,14 @@
           <time id="clock">--:--:--</time>
           <button id="refreshBtn" class="icon-btn" type="button" title="刷新行情">刷新</button>
           <button id="fullscreenBtn" class="icon-btn" type="button" title="沉浸视图">沉浸</button>
+          <span class="login-chip">登录/注册</span>
         </section>
       </header>
 
       <section class="workspace">
         <aside class="sidebar">
+          <input class="date-picker" type="text" value="请选择日期" readonly />
+
           <nav class="market-nav" aria-label="市场范围">
             <button class="active" data-map="global" type="button">A股全图</button>
             <button data-map="mainSH" type="button">上证A股</button>
@@ -57,16 +60,20 @@
 
           <div id="searchResults" class="search-results"></div>
 
-          <div class="tool-row">
-            <button id="captureBtn" type="button">截图分享</button>
-            <button id="autoBtn" class="active" type="button">自动刷新</button>
+          <div class="tool-row sponsor-stack">
+            <a class="advice advice-red" href="https://sckd.dapanyuntu.com" target="_blank" rel="noreferrer">市场宽度</a>
+            <button id="captureBtn" class="advice advice-blue" type="button">截图分享</button>
+            <button id="autoBtn" class="advice advice-cyan active" type="button">自动刷新</button>
           </div>
 
           <section class="notes">
-            <p>面积代表总市值</p>
-            <p>颜色代表涨跌幅或所选指标</p>
-            <p>拖动查看区域，滚轮缩放</p>
-            <p>双击个股打开雪球 K 线</p>
+            <p>概要提示：</p>
+            <p>· 面积代表总市值</p>
+            <p>· 颜色代表涨跌幅</p>
+            <p>· 每10秒更新涨跌情况</p>
+            <p>· 滚动或拖动鼠标查看板块细节</p>
+            <p>· 双击个股查看K线</p>
+            <p>· 休市后可进行当日复盘</p>
           </section>
         </aside>
 
@@ -79,7 +86,7 @@
 
       <footer class="bottom-bar">
         <section class="recall">
-          <span>本日复盘</span>
+          <span>本日复盘：</span>
           <button data-time="9:30" type="button">9:30</button>
           <button data-time="10:00" type="button">10:00</button>
           <button data-time="10:30" type="button">10:30</button>

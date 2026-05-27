@@ -203,7 +203,7 @@
     setupCanvas();
     const { width, height } = canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = "#191a18";
+    ctx.fillStyle = "#252931";
     ctx.fillRect(0, 0, width, height);
 
     const root = cloneTree(maps[state.mapKey]);
@@ -219,10 +219,10 @@
       const r = rect.screen;
       if (r.w < 0.6 || r.h < 0.6) return;
       const perf = nodePerf(rect.node);
-      ctx.fillStyle = rect.node.children ? "#292c28" : colorFor(perf.value);
+      ctx.fillStyle = rect.node.children ? "#252931" : colorFor(perf.value);
       ctx.fillRect(Math.round(r.x), Math.round(r.y), Math.ceil(r.w), Math.ceil(r.h));
 
-      ctx.strokeStyle = rect.node.depth <= 1 ? "#6b675e" : "rgba(0,0,0,.45)";
+      ctx.strokeStyle = rect.node.depth <= 1 ? "#5f6470" : "rgba(0,0,0,.55)";
       ctx.lineWidth = rect.node.depth <= 1 ? 1.2 : 0.65;
       ctx.strokeRect(Math.round(r.x) + 0.5, Math.round(r.y) + 0.5, Math.max(0, Math.ceil(r.w) - 1), Math.max(0, Math.ceil(r.h) - 1));
 
@@ -535,7 +535,7 @@
     await safeLoad(loadAll);
     setInterval(() => {
       if (!state.auto) return;
-      if (Date.now() - state.lastFetch < 15000) return;
+      if (Date.now() - state.lastFetch < 10000) return;
       if (state.metric === "mkt_idx.cur_chng_pct") safeLoad(loadAll);
     }, 15000);
   }
