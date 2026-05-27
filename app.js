@@ -1,4 +1,6 @@
 (() => {
+  // ==================== 配置数据 ====================
+  // 存储各个市场的树形结构数据（由外部库加载）
   const maps = {
     global: window.map_global,
     mainSH: window.map_mainSH,
@@ -46,33 +48,36 @@
   const captureImage = document.getElementById("captureImage");
   const downloadCapture = document.getElementById("downloadCapture");
 
+  // ==================== 应用状态 ====================
   const state = {
-    mapKey: "global",
-    metric: "mkt_idx.cur_chng_pct",
-    perf: {},
-    rects: [],
-    leaves: [],
-    hovered: null,
-    selected: null,
-    zoom: 1,
-    panX: 0,
-    panY: 0,
-    dragging: false,
-    auto: true,
-    lastFetch: 0,
+    mapKey: "global",           // 当前显示的市场类型
+    metric: "mkt_idx.cur_chng_pct", // 当前显示的指标（涨跌幅、PE等）
+    perf: {},                   // 股票的性能数据（涨跌幅、价格等）
+    rects: [],                  // 所有矩形的布局信息
+    leaves: [],                 // 叶子节点（实际股票）
+    hovered: null,              // 当前悬停的股票
+    selected: null,             // 当前选中的股票
+    zoom: 1,                    // 缩放级别
+    panX: 0,                    // 水平拖拽偏移
+    panY: 0,                    // 垂直拖拽偏移
+    dragging: false,            // 是否正在拖拽
+    auto: true,                 // 是否自动刷新行情
+    lastFetch: 0,               // 上次获取数据的时间戳
   };
 
+  // 克隆并处理树形数据（重新计算市值权重）
   function cloneTree(node, parent = null, depth = 0) {
     const copy = {
       name: node.name,
       id: node.id,
-      scale: Number(node.scale) || 1,
+      scale: Number(node.scale) || 1, // 市值权重
       parent,
-      depth,
+      depth,                           // 树的深度（0=顶层行业，1=子行业，2=股票）
       children: null,
     };
     if (Array.isArray(node.children) && node.children.length) {
       copy.children = node.children.map((child) => cloneTree(child, copy, depth + 1));
+      // 父节点的权重 = 所有子节点权重之和
       copy.scale = copy.children.reduce((sum, child) => sum + child.scale, 0) || copy.scale;
     }
     return copy;
@@ -94,12 +99,15 @@
     return nodes.reduce((sum, node) => sum + Math.max(0.01, node.scale), 0);
   }
 
+  // 平衡树形图布局：用于顶层行业分组，尽量保持矩形接近正方形
   function balancedTreemap(nodes, rect) {
     if (!nodes.length) return [];
     if (nodes.length === 1) return [{ node: nodes[0], ...rect }];
 
+    // 按市值降序排列
     const sorted = nodes.slice().sort((a, b) => b.scale - a.scale);
     const half = totalScale(sorted) / 2;
+    // 找到市值的中点位置，将列表分为两部分
     let acc = 0;
     let split = 1;
     for (; split < sorted.length - 1; split++) {
@@ -113,6 +121,7 @@
     const all = leftTotal + totalScale(right);
     const ratio = leftTotal / all;
 
+    // 根据矩形的宽高比，决定是横向还是纵向分割
     if (rect.w >= rect.h) {
       const w1 = rect.w * ratio;
       return [
@@ -163,6 +172,7 @@
     return { x: rect.x, y: rect.y + h, w: rect.w, h: Math.max(0, rect.h - h) };
   }
 
+  // Squarify树形图布局：用于个股排列，按纵横比优化（尽量接近正方形）
   function squarifiedTreemap(nodes, rect) {
     if (!nodes.length || rect.w <= 0 || rect.h <= 0) return [];
     if (nodes.length === 1) return [{ node: nodes[0], ...rect }];
@@ -177,9 +187,11 @@
     let remaining = { ...rect };
     let row = [];
 
+    // 贪心算法：逐个添加项目到当前行，直到纵横比变差
     while (items.length) {
       const item = items[0];
       const side = Math.min(remaining.w, remaining.h);
+      // 如果加入当前项能改善纵横比，就加入；否则提交这一行，开始新行
       if (!row.length || worstAspect([...row, item], side) <= worstAspect(row, side)) {
         row.push(items.shift());
       } else {
@@ -228,19 +240,22 @@
     return { value: values.reduce((a, b) => a + b, 0) / values.length, price: null };
   }
 
+  // 根据数值计算热力图颜色：红色表示上涨，绿色表示下跌，灰色表示无数据
   function colorFor(value) {
-    if (value === null || Number.isNaN(value)) return "#3e403f";
+    if (value === null || Number.isNaN(value)) return "#3e403f"; // 无数据显示灰色
     if (state.metric === "PE_TTM" || state.metric === "PB") {
+      // 估值指标：从绿色（低）到红色（高）
       const clamped = Math.max(0, Math.min(1, value / (state.metric === "PE_TTM" ? 120 : 9.6)));
-      const hue = 124 - clamped * 124;
+      const hue = 124 - clamped * 124; // 绿色(124) 到 红色(0)
       return `hsl(${hue} 72% ${32 + clamped * 10}%)`;
     }
 
+    // 涨跌幅指标：根据数值大小加深颜色
     const limit = state.metric === "mkt_idx.cur_chng_pct" ? 4 : state.metric === "THIS_YEAR_RATE" ? 32 : 24;
-    const mag = Math.min(1, Math.abs(value) / limit);
-    if (value > 0) return `hsl(2 76% ${26 + mag * 28}%)`;
-    if (value < 0) return `hsl(145 76% ${24 + mag * 28}%)`;
-    return "#444640";
+    const mag = Math.min(1, Math.abs(value) / limit); // 归一化到 0-1
+    if (value > 0) return `hsl(2 76% ${26 + mag * 28}%)`; // 红色
+    if (value < 0) return `hsl(145 76% ${24 + mag * 28}%)`; // 绿色
+    return "#444640"; // 零涨跌
   }
 
   function setupCanvas() {
@@ -264,40 +279,51 @@
     return rect.x + rect.w >= 0 && rect.y + rect.h >= 0 && rect.x <= width && rect.y <= height;
   }
 
+  // ==================== 主渲染函数 ====================
+  // 重新计算布局并绘制整个画布
   function render() {
     setupCanvas();
     const { width, height } = canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = "#252931";
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, width, height); // 填充背景色
 
+    // 计算树形布局
     const root = cloneTree(maps[state.mapKey]);
     const rects = [];
     layoutNode(root, { x: 0, y: 0, w: width, h: height }, rects);
+    // 应用缩放和拖拽变换
     state.rects = rects.map((rect) => ({ ...rect, screen: transformRect(rect) }));
 
+    // 只绘制可见的矩形，按深度排序（从浅到深）
     const drawRects = state.rects
       .filter((rect) => visible(rect.screen, width, height))
       .sort((a, b) => a.node.depth - b.node.depth);
 
     drawRects.forEach((rect) => {
       const r = rect.screen;
-      if (r.w < 0.6 || r.h < 0.6) return;
+      if (r.w < 0.6 || r.h < 0.6) return; // 太小的矩形不绘制
       const perf = nodePerf(rect.node);
+
+      // 绘制矩形：父节点用背景色，叶子节点用颜色表示涨跌幅
       ctx.fillStyle = rect.node.children ? "#252931" : colorFor(perf.value);
       ctx.fillRect(Math.round(r.x), Math.round(r.y), Math.ceil(r.w), Math.ceil(r.h));
 
+      // 绘制边框：顶层节点边框较粗，其他节点较细
       ctx.strokeStyle = rect.node.depth <= 1 ? "#5f6470" : "rgba(0,0,0,.55)";
       ctx.lineWidth = rect.node.depth <= 1 ? 1.2 : 0.65;
       ctx.strokeRect(Math.round(r.x) + 0.5, Math.round(r.y) + 0.5, Math.max(0, Math.ceil(r.w) - 1), Math.max(0, Math.ceil(r.h) - 1));
 
+      // 绘制标签：行业名称或股票名称+涨跌幅
       if (rect.node.depth <= 1 && r.w > 48 && r.h > 23) {
         const size = Math.min(24, Math.max(15, Math.sqrt(r.w * r.h) / 14));
         drawFittedText(rect.node.name, r.x + 7, r.y + size + 1, r.w - 14, size, "#f6eee4", true);
       } else if (!rect.node.children && r.w > 22 && r.h > 11) {
+        // 优化：降低阈值，小股票也能显示标签
         drawStockLabel(rect.node, perf, r);
       }
 
+      // 绘制选中效果：黄色边框
       if (state.selected && state.selected.id === rect.node.id) {
         ctx.strokeStyle = "#f5d66f";
         ctx.lineWidth = 3;
@@ -361,13 +387,16 @@
     return Math.max(6, Math.min(30, base, edgeLimit));
   }
 
+  // 绘制股票标签（名称和涨跌幅）
   function drawStockLabel(node, perf, rect) {
+    // 根据矩形大小计算字号
     let fontSize = stockFontSize(rect);
     let valueSize = Math.max(6, Math.min(fontSize * 0.94, rect.h / 3.4));
-    let pad = Math.max(2, Math.min(8, fontSize * 0.38));
-    const gap = 1;
+    let pad = Math.max(2, Math.min(8, fontSize * 0.38)); // 内边距
+    const gap = 1; // 名称和涨跌幅之间的间隔
     const availableHeight = rect.h - pad * 2;
 
+    // 如果空间不够，缩小字号
     if (availableHeight < fontSize + valueSize + gap) {
       const ratio = Math.max(0.38, availableHeight / (fontSize + valueSize + gap));
       fontSize = Math.max(6, fontSize * ratio);
@@ -376,18 +405,23 @@
     }
 
     const maxWidth = rect.w - pad * 2;
+    // 判断是否有足够空间显示涨跌幅
     const canShowValue = rect.h >= pad * 2 + fontSize + valueSize + gap && rect.w > 18 && valueSize >= 6 && perf.value !== null;
+    // 判断是否有足够空间显示名称
     const canShowName = rect.h >= pad * 2 + fontSize && rect.w > 16 && fontSize >= 6;
 
-    if (!canShowName) return;
+    if (!canShowName) return; // 空间太小，不显示任何文字
+
     const centerX = rect.x + rect.w / 2;
     const centerY = rect.y + rect.h / 2;
 
+    // 只能显示名称不能显示涨跌幅
     if (!canShowValue) {
       drawCenteredFittedText(node.name, centerX, centerY, maxWidth, fontSize, "#fff7ee", false);
       return;
     }
 
+    // 显示名称和涨跌幅，上下对齐
     const totalHeight = fontSize + valueSize + gap;
     drawCenteredFittedText(node.name, centerX, centerY - totalHeight / 2 + fontSize / 2, maxWidth, fontSize, "#fff7ee", false);
     drawCenteredFittedText(formatValue(perf.value), centerX, centerY + totalHeight / 2 - valueSize / 2, maxWidth, valueSize, "#fff7ee", true);
@@ -399,6 +433,7 @@
     return `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
   }
 
+  // 获取鼠标位置对应的矩形（取最深的层级）
   function hitTest(clientX, clientY) {
     const box = canvas.getBoundingClientRect();
     const x = clientX - box.left;
@@ -406,6 +441,7 @@
     let match = null;
     for (const rect of state.rects) {
       const r = rect.screen;
+      // 点击测试：找到包含该点的最深节点
       if (x >= r.x && y >= r.y && x <= r.x + r.w && y <= r.y + r.h) {
         if (!match || rect.node.depth > match.node.depth) match = rect;
       }
@@ -440,15 +476,18 @@
     });
   }
 
+  // ==================== 数据加载 ====================
+  // 代理API调用到后端服务器
   async function api(path) {
     const res = await fetch(`/api/dpyt${path}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   }
 
+  // 加载并显示主要指数（上证、深证、创业板等）
   async function loadIndexes() {
     const data = await api("/getRealtimeIndexes");
-    const entries = ["szzs", "szcz", "cyb", "kc50", "hs300"];
+    const entries = ["szzs", "szcz", "cyb", "kc50", "hs300"]; // 5个主要指数
     document.getElementById("indexStrip").innerHTML = entries
       .map((key) => {
         const [price = "--", rate = "--"] = String(data.data?.[key] || "").split(",");
@@ -472,6 +511,7 @@
     }[key];
   }
 
+  // 加载当前选中指标的数据（涨跌幅、PE等）
   async function loadPerf() {
     const metric = state.metric;
     const path =
@@ -479,11 +519,12 @@
         ? `/getMapParamDataV3?param=${encodeURIComponent(metric)}&changed=null`
         : `/getMapParamDataV2?param=${encodeURIComponent(metric)}`;
     const data = await api(path);
-    state.perf = data.data || {};
+    state.perf = data.data || {}; // 保存 { 股票代码: "涨跌幅|价格" }
     state.lastFetch = Date.now();
     render();
   }
 
+  // 加载历史数据（复盘功能）
   async function loadRecall(time) {
     const data = await api(`/getDayRecallRate?time=${encodeURIComponent(time)}`);
     state.perf = data.data || {};
@@ -669,11 +710,14 @@
     await Promise.all([loadIndexes(), loadPerf()]);
   }
 
+  // ==================== 初始化 ====================
   async function init() {
-    bindEvents();
-    renderLegend();
-    render();
-    await safeLoad(loadAll);
+    bindEvents();           // 绑定鼠标、滚轮、按钮事件
+    renderLegend();         // 绘制右侧的色彩图例
+    render();               // 首次渲染（使用默认的空结构）
+    await safeLoad(loadAll); // 加载指数和行情数据
+
+    // 自动刷新：每15秒检查一次，如果距上次获取>10秒就更新（仅涨跌幅指标）
     setInterval(() => {
       if (!state.auto) return;
       if (Date.now() - state.lastFetch < 10000) return;
