@@ -774,12 +774,12 @@
     render();               // 首次渲染（使用默认的空结构）
     await safeLoad(loadAll); // 加载指数和行情数据
 
-    // 自动刷新：每15秒检查一次，如果距上次获取>10秒就更新（仅涨跌幅指标）
+    // 自动刷新：每5秒更新一次（仅涨跌幅指标）
     setInterval(() => {
       if (!state.auto) return;
-      if (Date.now() - state.lastFetch < 10000) return;
+      if (Date.now() - state.lastFetch < 5000) return;
       if (state.metric === "mkt_idx.cur_chng_pct") safeLoad(loadAll);
-    }, 15000);
+    }, 5000);
   }
 
   init();
