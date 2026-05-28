@@ -217,7 +217,14 @@
       h: Math.max(0, rect.h - pad * 2 - header),
     };
 
-    const childRects = node.depth === 0 ? balancedTreemap(node.children, inner) : squarifiedTreemap(node.children, inner);
+    const aspect = inner.w > 0 && inner.h > 0 ? Math.max(inner.w / inner.h, inner.h / inner.w) : Infinity;
+    const tooNarrowToRead = node.depth >= 1 && (Math.min(inner.w, inner.h) < 28 || (aspect > 7.5 && Math.min(inner.w, inner.h) < 56));
+    if (tooNarrowToRead) {
+      out[out.length - 1].collapsed = true;
+      return;
+    }
+
+    const childRects = squarifiedTreemap(node.children, inner);
     childRects.forEach((item) => layoutNode(item.node, item, out));
   }
 
@@ -363,7 +370,7 @@
       const perf = nodePerf(rect.node);
 
       // 绘制矩形：父节点用背景色，叶子节点用颜色表示涨跌幅
-      ctx.fillStyle = rect.node.children ? "#252931" : colorFor(perf.value);
+      ctx.fillStyle = rect.node.children && !rect.collapsed ? "#252931" : colorFor(perf.value);
       ctx.fillRect(Math.round(r.x), Math.round(r.y), Math.ceil(r.w), Math.ceil(r.h));
 
       // 绘制边框：顶层节点边框较粗，其他节点较细
@@ -372,7 +379,9 @@
       ctx.strokeRect(Math.round(r.x) + 0.5, Math.round(r.y) + 0.5, Math.max(0, Math.ceil(r.w) - 1), Math.max(0, Math.ceil(r.h) - 1));
 
       // 绘制标签：行业名称或股票名称+涨跌幅
-      if (rect.node.depth <= 1 && r.w > 48 && r.h > 23) {
+      if (rect.collapsed && r.w > 34 && r.h > 18) {
+        drawStockLabel(rect.node, perf, r);
+      } else if (rect.node.depth <= 1 && r.w > 48 && r.h > 23) {
         const size = Math.min(13, Math.max(8, Math.sqrt(r.w * r.h) / 16));
         drawFittedText(rect.node.name, r.x + 7, r.y + size + 1, r.w - 14, size, "#f6eee4", true);
       } else if (!rect.node.children && r.w > 22 && r.h > 11) {
