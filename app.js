@@ -204,12 +204,31 @@
     return out;
   }
 
+  const GROUP_HEADER_MAX_DEPTH = 2;
+
+  function groupHeaderHeight(node, rect) {
+    if (!node.children || node.depth === 0 || node.depth > GROUP_HEADER_MAX_DEPTH) return 0;
+    if (rect.w < 34 || rect.h < 24) return 0;
+
+    const min = node.depth === 1 ? 15 : 12;
+    const max = node.depth === 1 ? 22 : 17;
+    const ratio = node.depth === 1 ? 0.12 : 0.16;
+    return Math.min(max, Math.max(min, rect.h * ratio), rect.h * 0.35);
+  }
+
+  function groupPadding(node) {
+    if (node.depth === 0) return 2;
+    if (node.depth === 1) return 2;
+    return 1.5;
+  }
+
   function layoutNode(node, rect, out) {
-    out.push({ node, ...rect });
+    const header = groupHeaderHeight(node, rect);
+    const current = { node, ...rect, header };
+    out.push(current);
     if (!node.children || node.children.length === 0 || rect.w < 12 || rect.h < 12) return;
 
-    const pad = node.depth === 0 ? 4 : 2;
-    const header = node.depth < 2 ? Math.min(21, Math.max(14, rect.h * 0.12)) : 0;
+    const pad = groupPadding(node);
     const inner = {
       x: rect.x + pad,
       y: rect.y + pad + header,
@@ -218,9 +237,11 @@
     };
 
     const aspect = inner.w > 0 && inner.h > 0 ? Math.max(inner.w / inner.h, inner.h / inner.w) : Infinity;
-    const tooNarrowToRead = node.depth >= 1 && (Math.min(inner.w, inner.h) < 28 || (aspect > 7.5 && Math.min(inner.w, inner.h) < 56));
+    const minChildEdge = node.depth >= 2 ? 10 : 18;
+    const longThinLimit = node.depth >= 2 ? 10 : 8;
+    const tooNarrowToRead = node.depth >= 1 && (Math.min(inner.w, inner.h) < minChildEdge || (aspect > longThinLimit && Math.min(inner.w, inner.h) < minChildEdge * 1.8));
     if (tooNarrowToRead) {
-      out[out.length - 1].collapsed = true;
+      current.collapsed = true;
       return;
     }
 
@@ -374,16 +395,15 @@
       ctx.fillRect(Math.round(r.x), Math.round(r.y), Math.ceil(r.w), Math.ceil(r.h));
 
       // 绘制边框：顶层节点边框较粗，其他节点较细
-      ctx.strokeStyle = rect.node.depth <= 1 ? "#5f6470" : "rgba(0,0,0,.55)";
-      ctx.lineWidth = rect.node.depth <= 1 ? 1.2 : 0.65;
+      ctx.strokeStyle = rect.node.depth <= 2 ? "#5f6470" : "rgba(0,0,0,.55)";
+      ctx.lineWidth = rect.node.depth <= 1 ? 1.2 : rect.node.depth === 2 ? 0.9 : 0.65;
       ctx.strokeRect(Math.round(r.x) + 0.5, Math.round(r.y) + 0.5, Math.max(0, Math.ceil(r.w) - 1), Math.max(0, Math.ceil(r.h) - 1));
 
       // 绘制标签：行业名称或股票名称+涨跌幅
       if (rect.collapsed && r.w > 34 && r.h > 18) {
         drawStockLabel(rect.node, perf, r);
-      } else if (rect.node.depth <= 1 && r.w > 48 && r.h > 23) {
-        const size = Math.min(13, Math.max(8, Math.sqrt(r.w * r.h) / 16));
-        drawFittedText(rect.node.name, r.x + 7, r.y + size + 1, r.w - 14, size, "#f6eee4", true);
+      } else if (rect.node.children && rect.header > 0 && r.w > 34 && r.h > 18) {
+        drawGroupHeader(rect.node, r, rect.header * state.zoom);
       } else if (!rect.node.children && r.w > 22 && r.h > 11) {
         // 优化：降低阈值，小股票也能显示标签
         drawStockLabel(rect.node, perf, r);
@@ -420,6 +440,27 @@
       clipped = clipped.slice(0, -1);
     }
     drawText(clipped.length > 1 ? `${clipped}...` : clipped, x, y, size, color, bold);
+  }
+
+  function drawGroupHeader(node, rect, headerHeight) {
+    const pad = node.depth === 1 ? 7 : 4;
+    const size = node.depth === 1
+      ? Math.min(14, Math.max(9, headerHeight - 4))
+      : Math.min(12, Math.max(8, headerHeight - 3));
+    const y = rect.y + Math.max(size + 1, (headerHeight + size) / 2 - 1);
+
+    ctx.save();
+    ctx.fillStyle = node.depth === 1 ? "rgba(255,255,255,.04)" : "rgba(255,255,255,.035)";
+    ctx.fillRect(Math.round(rect.x), Math.round(rect.y), Math.ceil(rect.w), Math.ceil(headerHeight));
+    ctx.strokeStyle = node.depth === 1 ? "rgba(182,188,202,.38)" : "rgba(182,188,202,.30)";
+    ctx.lineWidth = node.depth === 1 ? 1 : 0.8;
+    ctx.beginPath();
+    ctx.moveTo(Math.round(rect.x) + 0.5, Math.round(rect.y + headerHeight) + 0.5);
+    ctx.lineTo(Math.round(rect.x + rect.w) - 0.5, Math.round(rect.y + headerHeight) + 0.5);
+    ctx.stroke();
+    ctx.restore();
+
+    drawFittedText(node.name, rect.x + pad, y, rect.w - pad * 2, size, "#f6eee4", true);
   }
 
   function drawCenteredFittedText(text, cx, cy, maxWidth, size, color, bold) {
