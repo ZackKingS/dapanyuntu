@@ -487,6 +487,53 @@
     ctx.restore();
   }
 
+  function fitTextLines(text, maxWidth, size, bold, maxLines) {
+    const chars = Array.from(String(text));
+    ctx.font = `${bold ? "700 " : ""}${size}px Microsoft YaHei, Arial`;
+
+    const lines = [];
+    let line = "";
+    chars.forEach((char) => {
+      const next = line + char;
+      if (line && ctx.measureText(next).width > maxWidth) {
+        lines.push(line);
+        line = char;
+      } else {
+        line = next;
+      }
+    });
+    if (line) lines.push(line);
+
+    if (lines.length <= maxLines) return lines;
+
+    const clipped = lines.slice(0, maxLines);
+    let last = clipped[clipped.length - 1];
+    while (last.length > 1 && ctx.measureText(`${last}...`).width > maxWidth) {
+      last = last.slice(0, -1);
+    }
+    clipped[clipped.length - 1] = last.length > 1 ? `${last}...` : last;
+    return clipped;
+  }
+
+  function drawCenteredMultilineText(text, cx, cy, maxWidth, size, color, bold, maxLines) {
+    const lineHeight = size * 1.05;
+    const lines = fitTextLines(text, maxWidth, size, bold, maxLines);
+    const firstY = cy - ((lines.length - 1) * lineHeight) / 2;
+
+    ctx.save();
+    ctx.font = `${bold ? "700 " : ""}${size}px Microsoft YaHei, Arial`;
+    ctx.fillStyle = color;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(0, 0, 0, 0.78)";
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+    lines.forEach((line, index) => ctx.fillText(line, cx, firstY + index * lineHeight));
+    ctx.restore();
+    return lines.length;
+  }
+
   function stockFontSize(rect) {
     const area = rect.w * rect.h;
     const base = Math.sqrt(area) / 5.45;
@@ -524,14 +571,22 @@
 
     // 只能显示名称不能显示涨跌幅
     if (!canShowValue) {
-      drawCenteredFittedText(node.name, centerX, centerY, maxWidth, fontSize, "#fff7ee", false);
+      const maxNameLines = Math.max(1, Math.min(3, Math.floor(availableHeight / (fontSize * 1.05))));
+      drawCenteredMultilineText(node.name, centerX, centerY, maxWidth, fontSize, "#fff7ee", false, maxNameLines);
       return;
     }
 
     // 显示名称和涨跌幅，上下对齐
-    const totalHeight = fontSize + valueSize + gap;
-    drawCenteredFittedText(node.name, centerX, centerY - totalHeight / 2 + fontSize / 2, maxWidth, fontSize, "#fff7ee", false);
-    drawCenteredFittedText(formatValue(perf.value), centerX, centerY + totalHeight / 2 - valueSize / 2, maxWidth, valueSize, "#fff7ee", true);
+    const maxNameHeight = Math.max(fontSize, availableHeight - valueSize - gap);
+    const maxNameLines = Math.max(1, Math.min(3, Math.floor(maxNameHeight / (fontSize * 1.05))));
+    const nameLines = fitTextLines(node.name, maxWidth, fontSize, false, maxNameLines);
+    const nameHeight = nameLines.length * fontSize * 1.05;
+    const totalHeight = nameHeight + valueSize + gap;
+    const nameCenterY = centerY - totalHeight / 2 + nameHeight / 2;
+    const valueCenterY = centerY + totalHeight / 2 - valueSize / 2;
+
+    drawCenteredMultilineText(node.name, centerX, nameCenterY, maxWidth, fontSize, "#fff7ee", false, maxNameLines);
+    drawCenteredFittedText(formatValue(perf.value), centerX, valueCenterY, maxWidth, valueSize, "#fff7ee", true);
   }
 
   function formatValue(value) {
