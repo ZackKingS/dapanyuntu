@@ -55,6 +55,9 @@
     perf: {},                   // 股票的性能数据（涨跌幅、价格等）
     rects: [],                  // 所有矩形的布局信息
     leaves: [],                 // 叶子节点（实际股票）
+    trees: {},                  // 缓存克隆后的树结构
+    nodeCache: null,            // 节点性能缓存
+    leafLists: {},              // 预计算每个节点的叶子后代列表
     hovered: null,              // 当前悬停的股票
     selected: null,             // 当前选中的股票
     zoom: 1,                    // 缩放级别
@@ -95,46 +98,32 @@
     return list;
   }
 
+  function buildLeafLists(root) {
+    const map = new Map();
+    const all = flatten(root);
+    all.forEach((node) => {
+      if (!node.children) map.set(node, [node]);
+    });
+    // 从深到浅构建：父节点的叶子列表 = 子节点叶子列表的合并
+    const sorted = all.slice().sort((a, b) => b.depth - a.depth);
+    sorted.forEach((node) => {
+      if (node.children && !map.has(node)) {
+        const leaves = [];
+        node.children.forEach((child) => { leaves.push(...(map.get(child) || [])); });
+        map.set(node, leaves);
+      }
+    });
+    return map;
+  }
+
   function totalScale(nodes) {
     return nodes.reduce((sum, node) => sum + Math.max(0.01, node.scale), 0);
   }
 
-  // 平衡树形图布局：用于顶层行业分组，尽量保持矩形接近正方形
-  function balancedTreemap(nodes, rect) {
-    if (!nodes.length) return [];
-    if (nodes.length === 1) return [{ node: nodes[0], ...rect }];
-
-    // 按市值降序排列
-    const sorted = nodes.slice().sort((a, b) => b.scale - a.scale);
-    const half = totalScale(sorted) / 2;
-    // 找到市值的中点位置，将列表分为两部分
-    let acc = 0;
-    let split = 1;
-    for (; split < sorted.length - 1; split++) {
-      if (acc + sorted[split].scale > half) break;
-      acc += sorted[split].scale;
-    }
-
-    const left = sorted.slice(0, split);
-    const right = sorted.slice(split);
-    const leftTotal = totalScale(left);
-    const all = leftTotal + totalScale(right);
-    const ratio = leftTotal / all;
-
-    // 根据矩形的宽高比，决定是横向还是纵向分割
-    if (rect.w >= rect.h) {
-      const w1 = rect.w * ratio;
-      return [
-        ...balancedTreemap(left, { x: rect.x, y: rect.y, w: w1, h: rect.h }),
-        ...balancedTreemap(right, { x: rect.x + w1, y: rect.y, w: rect.w - w1, h: rect.h }),
-      ];
-    }
-
-    const h1 = rect.h * ratio;
-    return [
-      ...balancedTreemap(left, { x: rect.x, y: rect.y, w: rect.w, h: h1 }),
-      ...balancedTreemap(right, { x: rect.x, y: rect.y + h1, w: rect.w, h: rect.h - h1 }),
-    ];
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
   }
 
   function worstAspect(row, side) {
@@ -260,12 +249,21 @@
   }
 
   function nodePerf(node) {
-    if (!node.children) return parsePerf(state.perf[node.name]);
-    const values = walkLeaves(node)
-      .map((leaf) => parsePerf(state.perf[leaf.name]).value)
-      .filter((value) => value !== null);
-    if (!values.length) return { value: null, price: null };
-    return { value: values.reduce((a, b) => a + b, 0) / values.length, price: null };
+    if (state.nodeCache && state.nodeCache.has(node)) return state.nodeCache.get(node);
+    let perf;
+    if (!node.children) {
+      perf = parsePerf(state.perf[node.name]);
+    } else {
+      const leaves = state.leafLists[state.mapKey]?.get(node) || [];
+      const values = leaves
+        .map((leaf) => parsePerf(state.perf[leaf.name]).value)
+        .filter((v) => v !== null);
+      perf = values.length
+        ? { value: values.reduce((a, b) => a + b, 0) / values.length, price: null }
+        : { value: null, price: null };
+    }
+    if (state.nodeCache) state.nodeCache.set(node, perf);
+    return perf;
   }
 
   // 根据数值计算热力图颜色：红色表示上涨，绿色表示下跌，灰色表示无数据
@@ -364,17 +362,23 @@
     return rect.x + rect.w >= 0 && rect.y + rect.h >= 0 && rect.x <= width && rect.y <= height;
   }
 
+  let rafId = null;
+  function scheduleRender() {
+    if (rafId) return;
+    rafId = requestAnimationFrame(() => { rafId = null; render(); });
+  }
+
   // ==================== 主渲染函数 ====================
   // 重新计算布局并绘制整个画布
   function render() {
-    setupCanvas();
     const { width, height } = canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = "#252931";
     ctx.fillRect(0, 0, width, height); // 填充背景色
 
     // 计算树形布局
-    const root = cloneTree(maps[state.mapKey]);
+    const root = state.trees[state.mapKey];
+    if (!root) return;
     const rects = [];
     layoutNode(root, { x: 0, y: 0, w: width, h: height }, rects);
     // 应用缩放和拖拽变换
@@ -600,15 +604,15 @@
     const box = canvas.getBoundingClientRect();
     const x = clientX - box.left;
     const y = clientY - box.top;
-    let match = null;
-    for (const rect of state.rects) {
+    // 从深到浅遍历，第一个命中就是最深的节点
+    for (let i = state.rects.length - 1; i >= 0; i--) {
+      const rect = state.rects[i];
       const r = rect.screen;
-      // 点击测试：找到包含该点的最深节点
       if (x >= r.x && y >= r.y && x <= r.x + r.w && y <= r.y + r.h) {
-        if (!match || rect.node.depth > match.node.depth) match = rect;
+        return rect;
       }
     }
-    return match;
+    return null;
   }
 
   function showTooltip(rect, event) {
@@ -620,11 +624,11 @@
     const perf = nodePerf(rect.node);
     const parent = rect.node.parent ? rect.node.parent.name : mapNames[state.mapKey];
     tooltip.innerHTML = `
-      <strong>${rect.node.name}</strong>
-      <div><span>代码/分组</span><b>${rect.node.id || "--"}</b></div>
-      <div><span>所属</span><b>${parent}</b></div>
-      <div><span>${metricLabels[state.metric]}</span><b>${formatValue(perf.value)}</b></div>
-      <div><span>现价</span><b>${perf.price || "--"}</b></div>
+      <strong>${escapeHtml(rect.node.name)}</strong>
+      <div><span>代码/分组</span><b>${escapeHtml(rect.node.id || "--")}</b></div>
+      <div><span>所属</span><b>${escapeHtml(parent)}</b></div>
+      <div><span>${escapeHtml(metricLabels[state.metric])}</span><b>${escapeHtml(formatValue(perf.value))}</b></div>
+      <div><span>现价</span><b>${escapeHtml(perf.price || "--")}</b></div>
       <div><span>市值权重</span><b>${Math.round(rect.node.scale).toLocaleString()}</b></div>
     `;
     tooltip.hidden = false;
@@ -638,12 +642,27 @@
     });
   }
 
+  function isTradingTime() {
+    const now = new Date();
+    const day = now.getUTCDay();
+    if (day === 0 || day === 6) return false;
+    const t = now.getUTCHours() * 60 + now.getUTCMinutes();
+    return t >= 75 && t <= 210 || t >= 300 && t <= 420;
+  }
+
   // ==================== 数据加载 ====================
   // 代理API调用到后端服务器
-  async function api(path) {
-    const res = await fetch(`/api/dpyt${path}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
+  async function api(path, retries = 3) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const res = await fetch(`/api/dpyt${path}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      } catch (err) {
+        if (i === retries - 1) throw err;
+        await new Promise((r) => setTimeout(r, 500 * 2 ** i));
+      }
+    }
   }
 
   // 加载并显示主要指数（上证、深证、创业板等）
@@ -655,9 +674,9 @@
         const [price = "--", rate = "--"] = String(data.data?.[key] || "").split(",");
         const value = Number(rate);
         const cls = value > 0 ? "up" : value < 0 ? "down" : "flat";
-        return `<a class="index-card" href="${indexLink(key)}" target="_blank" rel="noreferrer">
-          <strong>${indexNames[key]}</strong>
-          <span class="${cls}">${price} ${rate}%</span>
+        return `<a class="index-card" href="${escapeHtml(indexLink(key))}" target="_blank" rel="noreferrer">
+          <strong>${escapeHtml(indexNames[key])}</strong>
+          <span class="${cls}">${escapeHtml(price)} ${escapeHtml(rate)}%</span>
         </a>`;
       })
       .join("");
@@ -681,7 +700,8 @@
         ? `/getMapParamDataV3?param=${encodeURIComponent(metric)}&changed=null`
         : `/getMapParamDataV2?param=${encodeURIComponent(metric)}`;
     const data = await api(path);
-    state.perf = data.data || {}; // 保存 { 股票代码: "涨跌幅|价格" }
+    state.perf = data.data || {};
+    state.nodeCache = new Map();
     state.lastFetch = Date.now();
     render();
   }
@@ -690,6 +710,7 @@
   async function loadRecall(time) {
     const data = await api(`/getDayRecallRate?time=${encodeURIComponent(time)}`);
     state.perf = data.data || {};
+    state.nodeCache = new Map();
     render();
   }
 
@@ -702,13 +723,16 @@
       .map((label) => {
         const value = Number(label.replace("%", ""));
         const color = legendColorFor(value);
-        return `<span class="legend-step" style="background:${color}">${label}</span>`;
+        return `<span class="legend-step" style="background:${color}">${escapeHtml(label)}</span>`;
       })
       .join("");
   }
 
   function bindEvents() {
-    window.addEventListener("resize", render);
+    window.addEventListener("resize", () => {
+      setupCanvas();
+      render();
+    });
     setInterval(updateClock, 1000);
     updateClock();
 
@@ -782,7 +806,7 @@
       if (!state.dragging) return;
       state.panX = state.dragging.panX + event.clientX - state.dragging.x;
       state.panY = state.dragging.panY + event.clientY - state.dragging.y;
-      render();
+      scheduleRender();
     });
 
     canvas.addEventListener(
@@ -797,7 +821,7 @@
         state.panX = x - ((x - state.panX) / oldZoom) * nextZoom;
         state.panY = y - ((y - state.panY) / oldZoom) * nextZoom;
         state.zoom = nextZoom;
-        render();
+        scheduleRender();
       },
       { passive: false },
     );
@@ -816,7 +840,11 @@
       window.open(`https://xueqiu.com/S/${symbolId}`, "_blank", "noreferrer");
     });
 
-    searchInput.addEventListener("input", handleSearch);
+    let searchTimer;
+    searchInput.addEventListener("input", () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(handleSearch, 150);
+    });
     document.getElementById("captureBtn").addEventListener("click", capture);
   }
 
@@ -829,15 +857,14 @@
       return;
     }
 
-    const root = cloneTree(maps[state.mapKey]);
-    const results = flatten(root)
+    const results = (state.flatNodes[state.mapKey] || [])
       .filter((node) => `${node.name} ${node.id}`.toLowerCase().includes(query))
       .slice(0, 30);
 
     searchResults.innerHTML = results
       .map(
         (node, index) =>
-          `<button class="search-item" data-index="${index}" type="button">${node.name}<span>${node.id || "--"}</span></button>`,
+          `<button class="search-item" data-index="${index}" type="button">${escapeHtml(node.name)}<span>${escapeHtml(node.id || "--")}</span></button>`,
       )
       .join("");
 
@@ -874,14 +901,30 @@
 
   // ==================== 初始化 ====================
   async function init() {
+    // 预克隆各市场树结构 + 预建扁平搜索索引
+    Object.keys(maps).forEach((key) => { state.trees[key] = cloneTree(maps[key]); });
+    state.flatNodes = {};
+    state.leafLists = {};
+    Object.keys(state.trees).forEach((key) => {
+      state.flatNodes[key] = flatten(state.trees[key]);
+      state.leafLists[key] = buildLeafLists(state.trees[key]);
+    });
+    state.nodeCache = new Map();
+
+    // 日期选择器默认今天
+    const datePicker = document.getElementById("datePicker");
+    if (datePicker) datePicker.value = new Date().toISOString().slice(0, 10);
+
     bindEvents();           // 绑定鼠标、滚轮、按钮事件
+    setupCanvas();          // 初始化 Canvas 尺寸和 DPR
     renderLegend();         // 绘制右侧的色彩图例
     render();               // 首次渲染（使用默认的空结构）
     await safeLoad(loadAll); // 加载指数和行情数据
 
-    // 自动刷新： （仅涨跌幅指标）
+    // 自动刷新：仅交易时段 + 涨跌幅指标
     setInterval(() => {
       if (!state.auto) return;
+      if (!isTradingTime()) return;
       if (Date.now() - state.lastFetch < 500) return;
       if (state.metric === "mkt_idx.cur_chng_pct") safeLoad(loadAll);
     }, 2000);

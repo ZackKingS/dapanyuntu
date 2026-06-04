@@ -110,7 +110,7 @@ button {
 
 .index-card strong {
   font-size: 13px;
-  color: #fefefe;
+  color: var(--text);
   font-weight: 400;
 }
 
@@ -129,7 +129,7 @@ button {
 }
 
 .flat {
-  color: #fefefe;
+  color: var(--text);
 }
 
 .top-actions {
@@ -140,7 +140,7 @@ button {
 
 #clock {
   width: 78px;
-  color: #fefefe;
+  color: var(--text);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -154,17 +154,6 @@ button {
   background: var(--panel-2);
   border: 0;
   border-radius: 3px;
-}
-
-.login-chip {
-  display: grid;
-  place-items: center;
-  min-width: 76px;
-  height: 34px;
-  color: #fefefe;
-  background: transparent;
-  font-size: 14px;
-  white-space: nowrap;
 }
 
 .icon-btn:hover,
@@ -257,8 +246,8 @@ button {
 .search-item {
   padding: 8px;
   color: var(--text);
-  background: #383b44;
-  border: 1px solid #535663;
+  background: var(--panel);
+  border: 1px solid var(--panel-2);
   border-radius: 3px;
   text-align: left;
 }
@@ -285,7 +274,7 @@ button {
   width: 100%;
   min-height: 32px;
   padding: 0 8px;
-  color: #fefefe;
+  color: var(--text);
   border-radius: 5px;
   font-size: 16px;
   font-weight: 700;
@@ -306,7 +295,7 @@ button {
 .notes {
   display: grid;
   gap: 5px;
-  color: #fefefe;
+  color: var(--text);
   font-size: 12px;
   line-height: 1.35;
 }
@@ -358,7 +347,7 @@ button {
   justify-content: space-between;
   gap: 20px;
   margin-top: 4px;
-  color: #fefefe;
+  color: var(--text);
 }
 
 .empty-state {
@@ -390,7 +379,7 @@ button {
 }
 
 .recall span {
-  color: #fefefe;
+  color: var(--text);
   white-space: nowrap;
 }
 
@@ -398,7 +387,7 @@ button {
   min-height: 27px;
   padding: 0 9px;
   font-size: 13px;
-  background: #535663;
+  background: var(--panel-2);
   border-radius: 2px;
 }
 
@@ -422,7 +411,7 @@ dialog {
   padding: 14px;
   background: var(--bg);
   color: var(--text);
-  border: 1px solid #535663;
+  border: 1px solid var(--panel-2);
   border-radius: 8px;
   box-shadow: var(--shadow);
 }
@@ -438,7 +427,7 @@ dialog::backdrop {
   width: 30px;
   height: 30px;
   color: white;
-  background: #535663;
+  background: var(--panel-2);
   border-radius: 50%;
 }
 

@@ -84,15 +84,20 @@ async function proxyDpyt(req, res, url) {
   const target = new URL(DATA_HOST + targetPath);
   url.searchParams.forEach((value, key) => target.searchParams.set(key, value));
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
   try {
     // 发起请求到上游服务器
     const upstream = await fetch(target, {
+      signal: controller.signal,
       headers: {
         "user-agent": "Mozilla/5.0 local dapanyuntu clone",
         "referer": "https://dapanyuntu.com/",
       },
     });
     let text = await upstream.text();
+    clearTimeout(timeout);
 
     // 处理响应数据：移除股票名称中的 -U 后缀
     if (targetPath === "/dpyt/getMapParamDataV3" || targetPath === "/dpyt/getMapParamDataV2") {
@@ -106,6 +111,7 @@ async function proxyDpyt(req, res, url) {
       "access-control-allow-origin": "*", // 允许所有来源的跨域请求
     });
   } catch (error) {
+    clearTimeout(timeout);
     // 上游请求失败（网络错误、服务器无法访问等）
     send(
       res,
